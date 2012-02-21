@@ -12,35 +12,16 @@ class String
 end
 
 class Contact
-  attr_accessor :name, :type, :title, :email, :phone, :fax, :toll_free
+  attr_accessor :name, :type, :title, :email, :phones, :fax, :toll_free
 end
 
-class Phone
-  attr_accessor :type, :number
+class Program
+  attr_accessor :external_id, :category, :type, :products, :trademarks, :notes, :contacts
 end
 
-class Company
-  attr_accessor :name, :city, :zipcode, :website, :address1, :address2, :state, :email, :website,
-    :phones, :country, :contacts, :external_id
-
-  def parseAddress text
-    @country = (text.include? "Canada") ? "Canada" : "USA"
-    lines = text.partition("Personnel\n||").first.split("\n").delete_if do |l|
-      l.eql? "||" or l.include? "Canada"
-    end
-
-    case lines.length
-    when 0
-      @address1 = nil
-      @address2 = nil
-    when 1..2
-      @address1 = lines.first
-      @address2 = lines.last unless lines.last.eql? lines.first
-    else
-      mid = lines.length / 2
-      @address1 = lines[0..mid]
-      @address2 = lines[mid+1..lines.length-1]
-    end
+def getAttribute attribute, t
+  t.match(Regexp.new("#{attribute}\n(?<#{attribute.downcase}>.*$)")) do |m|
+    m[attribute.downcase.to_sym].split(";").collect { |p| p.strip }.join ", "
   end
 end
 
@@ -52,6 +33,7 @@ def parseContacts text_data
     l.split("\n\n").each do |contact|
       unmatched = []
       c = Contact.new
+      c.phones = []
 
       contact.split("\n").each do |row|
         # Skip empty lines
@@ -71,7 +53,7 @@ def parseContacts text_data
         end
         f = row.isAttribute? "Phone"
         if f.first
-          c.phone = f.last.strip
+          c.phones.push f.last.strip
           next
         end
         f = row.isAttribute? "Toll Free"
@@ -117,44 +99,40 @@ def parseContacts text_data
           unmatched = unmatched.delete(0)
           next
         end
+
+        unmatched = unmatched.delete(-1) if unmatched.last.include? "All"
       end
 
       contacts.push c
     end
   end
+
+  contacts
 end
 
-def parseCompany row
-  c = Company.new
-  c.external_id = row[1].strip
-  c.name = row[27].strip
-  c.parseAddress row[6]
-  c.city = row[3].strip
-  c.zipcode = row[4].strip
-  c.state = row[7].strip
-  c.email = row[8].strip
-  c.website = row[5].strip
+def parseProgram row
+  p = Program.new
+  p.external_id = row[9].split("-").first
+  p.category = row[2]
 
-  c.phones = []
-  (11..26).reject { |i| i % 2 == 0 }.each do |i|
-    unless row[i].eql? "NULL"
-      p = Phone.new
-      p.number = row[i]
-      p.type = row[i+1]
-      c.phones.push p
-    end
-  end
+  # parse details
+  p.type = getAttribute "Type", row[4]
+  p.products = getAttribute "Products", row[4]
+  p.trademarks = getAttribute "Trademarks", row[4]
+  p.notes = row[4]
 
-  c.contacts = parseContacts row[2].partition(/Personnel\nprogram contact/i).last
+  # parse contacts
+  p.contacts = parseContacts p.notes.split("Personnel").last if p.notes.include? "Personnel"
 
-  c
+  p
 end
 
 def readFile
-  companies = []
-  CSV.foreach(File.join"salesverge_companies.csv") do |row|
-    next if row.last.eql? "company_name" #skip header row
-    companies.push parseCompany row
+  programs = []
+
+  CSV.foreach("salesverge_programs.csv") do |row|
+    next if row.last.eql? "updated_at"
+    programs.push parseProgram row
   end
 end
 
