@@ -1,0 +1,12 @@
+%div.company
+  %p.name
+    %a=link_to company.name, company
+  - if company.website
+    %p.website
+      Website:
+      %a{ :href => "http://#{company.website}/" }
+        =company.website
+  %p.location="#{company.city}, #{company.state}"
+  %p.email=mail_to company.email
+  %p.programs
+    %a=link_to "#{pluralize(company.programs.count, "Program")}", company_programs_url(company)

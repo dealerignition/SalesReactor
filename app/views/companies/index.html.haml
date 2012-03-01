@@ -1,0 +1,6 @@
+%div.search
+  %p Search
+  %input{ :type => "text" }
+%div#companies
+  - @companies.each do |company|
+    =render company

@@ -1,4 +1,12 @@
 SalesVerge::Application.routes.draw do
+  root :to => "companies#index"
+
+  resources :programs
+
+  resources :companies do
+    resources :programs
+  end
+
   # The priority is based upon order of creation:
   # first created -> highest priority.
 
